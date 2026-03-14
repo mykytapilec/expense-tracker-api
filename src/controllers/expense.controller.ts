@@ -2,76 +2,157 @@ import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 
 export const createExpense = async (req: Request, res: Response) => {
-  const userId = req.userId;
+  try {
+    const userId = req.userId as string;
+    const { amount, category, note, date } = req.body;
 
-  const { amount, category, note, date } = req.body;
+    const expense = await prisma.expense.create({
+      data: {
+        amount,
+        category,
+        note,
+        date: new Date(date),
+        userId,
+      },
+    });
 
-  const expense = await prisma.expense.create({
-    data: {
-      amount,
-      category,
-      note,
-      date: new Date(date),
-      userId,
-    },
-  });
-
-  res.status(201).json(expense);
+    res.status(201).json(expense);
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ message: "Invalid expense data" });
+  }
 };
 
 export const getExpenses = async (req: Request, res: Response) => {
-  const userId = req.userId;
+  try {
+    const userId = req.userId as string;
 
-  const expenses = await prisma.expense.findMany({
-    where: { userId },
-    orderBy: { date: "desc" },
-  });
+    const {
+      page = "1",
+      limit = "10",
+      category,
+      startDate,
+      endDate,
+    } = req.query;
 
-  res.json(expenses);
+    const pageNumber = parseInt(page as string, 10);
+    const pageSize = parseInt(limit as string, 10);
+
+    const where: any = { userId };
+
+    if (category) where.category = category;
+    if (startDate || endDate) {
+      where.date = {};
+      if (startDate) where.date.gte = new Date(startDate as string);
+      if (endDate) where.date.lte = new Date(endDate as string);
+    }
+
+    const expenses = await prisma.expense.findMany({
+      where,
+      orderBy: { date: "desc" },
+      skip: (pageNumber - 1) * pageSize,
+      take: pageSize,
+    });
+
+    const total = await prisma.expense.count({ where });
+
+    res.json({
+      page: pageNumber,
+      limit: pageSize,
+      total,
+      data: expenses,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ message: "Cannot fetch expenses" });
+  }
 };
 
 export const updateExpense = async (req: Request, res: Response) => {
-  const userId = req.userId;
-  const { id } = req.params;
+  try {
+    const userId = req.userId as string;
+    const { id } = req.params;
+    const { amount, category, note, date } = req.body;
 
-  const { amount, category, note, date } = req.body;
+    const expense = await prisma.expense.findUnique({ where: { id } });
 
-  const expense = await prisma.expense.findUnique({
-    where: { id },
-  });
+    if (!expense || expense.userId !== userId) {
+      return res.status(404).json({ message: "Expense not found" });
+    }
 
-  if (!expense || expense.userId !== userId) {
-    return res.status(404).json({ message: "Expense not found" });
+    const updatedExpense = await prisma.expense.update({
+      where: { id },
+      data: {
+        amount,
+        category,
+        note,
+        date: date ? new Date(date) : undefined,
+      },
+    });
+
+    res.json(updatedExpense);
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ message: "Cannot update expense" });
   }
-
-  const updatedExpense = await prisma.expense.update({
-    where: { id },
-    data: {
-      amount,
-      category,
-      note,
-      date: date ? new Date(date) : undefined,
-    },
-  });
-
-  res.json(updatedExpense);
 };
 
 export const deleteExpense = async (req: Request, res: Response) => {
-  const userId = req.userId;
-  const { id } = req.params;
+  try {
+    const userId = req.userId as string;
+    const { id } = req.params;
 
-  const expense = await prisma.expense.findUnique({
-    where: { id },
-  });
+    const expense = await prisma.expense.findUnique({ where: { id } });
 
-  if (!expense || expense.userId !== userId) {
-    return res.status(404).json({ message: "Expense not found" });
+    if (!expense || expense.userId !== userId) {
+      return res.status(404).json({ message: "Expense not found" });
+    }
+
+    await prisma.expense.delete({ where: { id } });
+
+    res.json({ message: "Expense deleted" });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ message: "Cannot delete expense" });
   }
+};
 
-  await prisma.expense.delete({
-    where: { id },
-  });
+export const getExpensesByRange = async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId as string;
+    const { range } = req.query;
 
-  res.json({ message: "Expense deleted" });
+    let startDate: Date;
+
+    const today = new Date();
+    switch (range) {
+      case "week":
+        startDate = new Date(today);
+        startDate.setDate(today.getDate() - 7);
+        break;
+      case "month":
+        startDate = new Date(today);
+        startDate.setMonth(today.getMonth() - 1);
+        break;
+      case "3months":
+        startDate = new Date(today);
+        startDate.setMonth(today.getMonth() - 3);
+        break;
+      default:
+        return res.status(400).json({ message: "Invalid range" });
+    }
+
+    const expenses = await prisma.expense.findMany({
+      where: {
+        userId,
+        date: { gte: startDate, lte: today },
+      },
+      orderBy: { date: "desc" },
+    });
+
+    res.json(expenses);
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ message: "Cannot fetch expenses by range" });
+  }
 };
