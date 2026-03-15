@@ -156,3 +156,29 @@ export const getExpensesByRange = async (req: Request, res: Response) => {
     res.status(400).json({ message: "Cannot fetch expenses by range" });
   }
 };
+
+export const getExpenseStats = async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId as string;
+
+    const stats = await prisma.expense.groupBy({
+      by: ["category"],
+      where: {
+        userId,
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+
+    const result = stats.map((item: { category: string; _sum: { amount: number | null } }) => ({
+      category: item.category,
+      total: item._sum.amount || 0,
+    }));
+
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to fetch expense statistics" });
+  }
+};

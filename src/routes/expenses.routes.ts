@@ -5,6 +5,7 @@ import {
   deleteExpense,
   getExpenses,
   getExpensesByRange,
+  getExpenseStats,
   updateExpense,
 } from "../controllers/expense.controller";
 
@@ -15,5 +16,6 @@ router.get("/", authMiddleware, getExpenses);
 router.put("/:id", authMiddleware, updateExpense);
 router.delete("/:id", authMiddleware, deleteExpense);
 router.get("/range", getExpensesByRange);
+router.get("/stats", getExpenseStats);
 
 export default router;
