@@ -71,14 +71,15 @@ export const getExpenses = async (req: Request, res: Response) => {
 export const updateExpense = async (req: Request, res: Response) => {
   try {
     const userId = req.userId as string;
-    const { id } = req.params;
-    const { amount, category, note, date } = req.body;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
     const expense = await prisma.expense.findUnique({ where: { id } });
 
     if (!expense || expense.userId !== userId) {
       return res.status(404).json({ message: "Expense not found" });
     }
+
+    const { amount, category, note, date } = req.body;
 
     const updatedExpense = await prisma.expense.update({
       where: { id },
@@ -100,7 +101,7 @@ export const updateExpense = async (req: Request, res: Response) => {
 export const deleteExpense = async (req: Request, res: Response) => {
   try {
     const userId = req.userId as string;
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
     const expense = await prisma.expense.findUnique({ where: { id } });
 
@@ -163,12 +164,8 @@ export const getExpenseStats = async (req: Request, res: Response) => {
 
     const stats = await prisma.expense.groupBy({
       by: ["category"],
-      where: {
-        userId,
-      },
-      _sum: {
-        amount: true,
-      },
+      where: { userId },
+      _sum: { amount: true },
     });
 
     const result = stats.map((item: { category: string; _sum: { amount: number | null } }) => ({
@@ -199,20 +196,12 @@ export const getMonthlySummary = async (req: Request, res: Response) => {
     const result = await prisma.expense.aggregate({
       where: {
         userId,
-        date: {
-          gte: startDate,
-          lt: endDate,
-        },
+        date: { gte: startDate, lt: endDate },
       },
-      _sum: {
-        amount: true,
-      },
+      _sum: { amount: true },
     });
 
-    res.json({
-      month,
-      total: result._sum.amount || 0,
-    });
+    res.json({ month, total: result._sum.amount || 0 });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to fetch monthly summary" });
@@ -228,17 +217,9 @@ export const getTopCategories = async (req: Request, res: Response) => {
 
     const stats = await prisma.expense.groupBy({
       by: ["category"],
-      where: {
-        userId,
-      },
-      _sum: {
-        amount: true,
-      },
-      orderBy: {
-        _sum: {
-          amount: "desc",
-        },
-      },
+      where: { userId },
+      _sum: { amount: true },
+      orderBy: { _sum: { amount: "desc" } },
       take: limitNumber,
     });
 
