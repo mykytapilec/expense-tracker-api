@@ -182,3 +182,39 @@ export const getExpenseStats = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to fetch expense statistics" });
   }
 };
+
+export const getMonthlySummary = async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId as string;
+    const { month } = req.query;
+
+    if (!month) {
+      return res.status(400).json({ message: "Month is required (YYYY-MM)" });
+    }
+
+    const startDate = new Date(`${month}-01`);
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 1);
+
+    const result = await prisma.expense.aggregate({
+      where: {
+        userId,
+        date: {
+          gte: startDate,
+          lt: endDate,
+        },
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+
+    res.json({
+      month,
+      total: result._sum.amount || 0,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to fetch monthly summary" });
+  }
+};
