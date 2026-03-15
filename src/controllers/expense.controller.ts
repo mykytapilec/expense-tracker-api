@@ -218,3 +218,38 @@ export const getMonthlySummary = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to fetch monthly summary" });
   }
 };
+
+export const getTopCategories = async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId as string;
+    const { limit = "5" } = req.query;
+
+    const limitNumber = parseInt(limit as string, 10);
+
+    const stats = await prisma.expense.groupBy({
+      by: ["category"],
+      where: {
+        userId,
+      },
+      _sum: {
+        amount: true,
+      },
+      orderBy: {
+        _sum: {
+          amount: "desc",
+        },
+      },
+      take: limitNumber,
+    });
+
+    const result = stats.map((item: { category: string; _sum: { amount: number | null } }) => ({
+      category: item.category,
+      total: item._sum.amount || 0,
+    }));
+
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to fetch top categories" });
+  }
+};

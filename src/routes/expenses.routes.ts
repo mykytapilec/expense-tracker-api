@@ -7,6 +7,7 @@ import {
   getExpensesByRange,
   getExpenseStats,
   getMonthlySummary,
+  getTopCategories,
   updateExpense,
 } from "../controllers/expense.controller";
 
@@ -19,5 +20,6 @@ router.delete("/:id", authMiddleware, deleteExpense);
 router.get("/range", getExpensesByRange);
 router.get("/stats", getExpenseStats);
 router.get("/summary", getMonthlySummary);
+router.get("/top-categories", getTopCategories);
 
 export default router;
